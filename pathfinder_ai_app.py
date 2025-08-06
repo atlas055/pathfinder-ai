@@ -3,21 +3,24 @@ import pandas as pd
 import openai
 import datetime
 
-# Language setup
+# Initialize language in session state
 if "lang" not in st.session_state:
     st.session_state.lang = "EN"
 
 def toggle_lang():
     st.session_state.lang = "ع" if st.session_state.lang == "EN" else "EN"
 
+# Prepare language toggle button label (show language to switch TO)
+lang_button_label = "EN" if st.session_state.lang == "ع" else "ع"
+
 st.set_page_config(page_title="Pathfinder.AI", layout="wide")
 
 # Language switch button top-right
 col_lang1, col_lang2 = st.columns([9, 1])
 with col_lang2:
-    st.button(st.session_state.lang, on_click=toggle_lang)
+    st.button(lang_button_label, on_click=toggle_lang)
 
-# Text content dictionary for EN and AR (simplified example)
+# Text content for EN and AR
 texts = {
     "EN": {
         "title": "🚀 Pathfinder.AI — Your AI Career Advisor",
@@ -63,7 +66,12 @@ texts = {
 
 t = texts[st.session_state.lang]
 
+# Title and Made by Saudi hands under it
 st.title(t["title"])
+st.markdown(
+    f'<p style="font-size:12px; color:gray; opacity:0.6; margin-top:-10px;">{t["made_by"]}</p>',
+    unsafe_allow_html=True
+)
 
 st.markdown("---")
 
@@ -97,7 +105,6 @@ with st.form("career_form", clear_on_submit=False):
             university = st.text_input(t["university"].format(i=i+1), key=f"uni_{i}")
         degrees.append(f"{deg_type} in {major} from {university}")
 
-    # New skills list with non-tech options + autocomplete
     skill_options = [
         "Python", "SQL", "Machine Learning", "Data Analysis", "Cybersecurity",
         "Cloud Computing", "Project Management", "UX/UI",
@@ -110,7 +117,6 @@ with st.form("career_form", clear_on_submit=False):
     if other_skill and other_skill not in skills:
         skills.append(other_skill)
 
-    # Languages spoken multi-select (example list)
     language_options = ["Arabic", "English", "French", "Spanish", "Chinese", "Hindi", "Other"]
     languages = st.multiselect(t["languages"], language_options, key="languages")
 
@@ -174,9 +180,5 @@ if submitted:
 st.markdown("---")
 st.markdown(
     f'<p style="font-size:10px; color:gray; opacity:0.6;">{t["footer"]}</p>',
-    unsafe_allow_html=True
-)
-st.markdown(
-    f'<p style="font-size:9px; color:gray; opacity:0.4; text-align:center;">{t["made_by"]}</p>',
     unsafe_allow_html=True
 )
