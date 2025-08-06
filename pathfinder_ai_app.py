@@ -1,57 +1,99 @@
 import streamlit as st
+import pandas as pd
 import openai
-import os
+import datetime
 
-# ---- CONFIGURATION ----
-openai.api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else os.getenv("OPENAI_API_KEY")
+st.set_page_config(page_title="Pathfinder.AI", layout="wide")
+st.title("🚀 Pathfinder.AI — Your AI Career Advisor")
 
-st.set_page_config(page_title="PathFinder.AI", layout="centered")
-st.title("🎯 PathFinder.AI: Your AI Career Advisor")
-st.markdown("_Get personalized career paths, learning roadmaps, and internship suggestions powered by AI._")
+# Load API Key
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# ---- USER INPUT ----
-st.subheader("Tell us about yourself")
-gpa = st.text_input("GPA", max_chars=4)
-skills = st.text_area("List your skills (comma-separated)")
-interests = st.text_area("What are your interests?")
-career_goal = st.text_input("Career goal (optional)")
+st.markdown("---")
 
-# ---- BUILD PROMPT ----
-def build_prompt(gpa, skills, interests, goal):
-    return f"""
-    I’m building a career roadmap for a computer science student. Here are their details:
-    - GPA: {gpa}
-    - Skills: {skills}
-    - Interests: {interests}
-    - Career goal: {goal if goal else "Not sure yet"}
+# --- USER INPUT FORM ---
+with st.form("career_form", clear_on_submit=False):
+    name = st.text_input("👤 Your Full Name")
 
-    Based on this, suggest:
-    1. Top 3 career options
-    2. A 6-month personalized learning roadmap with specific courses/resources
-    3. Project or internship ideas for each career
-    4. Recommended certifications or achievements
-
-    Format your response clearly with bullet points and sections.
-    """
-
-# ---- GENERATE OUTPUT ----
-if st.button("🧠 Generate My Career Path"):
-    if not gpa or not skills or not interests:
-        st.warning("Please fill in at least GPA, skills, and interests.")
+    experience_years = st.slider("🧠 Years of Experience", 0, 30, 0)
+    if experience_years <= 1:
+        level = "Fresh Graduate"
+    elif experience_years <= 5:
+        level = "Early Career"
+    elif experience_years <= 10:
+        level = "Mid Career"
     else:
-        with st.spinner("Thinking... 🧠"):
-            try:
-                prompt = build_prompt(gpa, skills, interests, career_goal)
-                response = openai.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful and professional AI career advisor."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.7
-                )
-                result = response.choices[0].message.content
-                st.success("Here’s your personalized career path 👇")
-                st.markdown(result)
-            except Exception as e:
-                st.error(f"Error: {e}")
+        level = "Senior Level"
+
+    degree_count = st.selectbox("🎓 How many degrees do you have?", [1, 2, 3])
+    degrees = []
+    for i in range(degree_count):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            deg_type = st.selectbox(f"Degree {i+1} Type", ["Diploma", "Bachelor's", "Master's", "PhD"], key=f"deg_type_{i}")
+        with col2:
+            major = st.text_input(f"Major {i+1}", key=f"major_{i}")
+        with col3:
+            university = st.text_input(f"University {i+1}", key=f"uni_{i}")
+        degrees.append(f"{deg_type} in {major} from {university}")
+
+    skills = st.multiselect("💡 Your Skills", ["Python", "SQL", "Machine Learning", "Data Analysis", "Cybersecurity", "Cloud Computing", "Project Management", "UX/UI"], key="skills")
+    other_skill = st.text_input("Other Skill (if any)")
+    if other_skill:
+        skills.append(other_skill)
+
+    cert_files = st.file_uploader("📎 Upload any certifications (optional)", type=["pdf", "jpg", "png"], accept_multiple_files=True)
+
+    employment_status = st.text_area("💼 What's your current employment situation and what do you aspire to work in?")
+    career_shift = st.text_area("🔁 Are you switching careers? If so, from what to what?")
+
+    submitted = st.form_submit_button("🔍 Generate Career Roadmap")
+
+# --- RESPONSE GENERATION ---
+if submitted:
+    with st.spinner("Thinking..."):
+        # Save to CSV
+        user_data = {
+            "Name": name,
+            "Experience": experience_years,
+            "Level": level,
+            "Degrees": " | ".join(degrees),
+            "Skills": ", ".join(skills),
+            "EmploymentStatus": employment_status,
+            "CareerShift": career_shift,
+            "Timestamp": datetime.datetime.now()
+        }
+        df = pd.DataFrame([user_data])
+        try:
+            existing = pd.read_csv("submissions.csv")
+            updated = pd.concat([existing, df], ignore_index=True)
+        except:
+            updated = df
+        updated.to_csv("submissions.csv", index=False)
+
+        # Prompt AI
+        prompt = f"""
+        I am an AI career assistant. Based on the following info, give me a tailored roadmap.
+
+        Name: {name}
+        Experience Level: {level}
+        Years of Experience: {experience_years}
+        Degrees: {', '.join(degrees)}
+        Skills: {', '.join(skills)}
+        Employment Situation: {employment_status}
+        Career Shift: {career_shift}
+
+        I want a realistic and accurate output. Do not recommend advanced certifications like PMP to fresh graduates. Recommend suitable certifications, programs, and job platforms for this person. Also suggest a 3-6 month learning path.
+        """
+
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        st.subheader("🎯 Personalized AI Career Roadmap")
+        st.write(response.choices[0].message.content)
+
+# --- Footer ---
+st.markdown("---")
+st.caption("By using this website, you agree that your data may be stored to improve the tool and notify you of future opportunities.")
